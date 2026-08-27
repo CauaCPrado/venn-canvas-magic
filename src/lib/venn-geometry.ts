@@ -67,7 +67,7 @@ function norm(a: number) {
  */
 export function intersectionPathD(circles: Circle[]): string | null {
   if (circles.length === 0) return null;
-  if (circles.length === 1) return circlePathD(circles[0]);
+  if (circles.length === 1) return circlePathD(circles[0]!);
 
   // one circle fully inside every other -> region is that circle
   for (const c of circles) {
