@@ -6,7 +6,6 @@ interface Props {
   diagram: Diagram;
   selected: boolean;
   onSelect: (id: string, additive: boolean) => void;
-  onPatch: (id: string, patch: Partial<VennSet>) => void;
   onLivePatch: (id: string, patch: Partial<VennSet>) => void;
   onCommitLive: () => void;
   onDelete: (id: string) => void;
@@ -17,7 +16,6 @@ export function SetCard({
   diagram,
   selected,
   onSelect,
-  onPatch,
   onLivePatch,
   onCommitLive,
   onDelete,
@@ -108,7 +106,6 @@ export function SetCard({
           ? ` (${set.elements.length} nomeados + ${set.count} sem nome)`
           : ""}
       </div>
-      <span className="sr-only">{onPatch ? "" : ""}</span>
     </div>
   );
 }
