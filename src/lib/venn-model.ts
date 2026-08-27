@@ -112,7 +112,7 @@ export function createBasicSet(
   opts: { name?: string; elements?: string[]; count?: number },
 ): Diagram {
   const id = `s${d.nextId}`;
-  const color = PALETTE[d.colorIdx % PALETTE.length];
+  const color = PALETTE[d.colorIdx % PALETTE.length]!;
   const idx = d.sets.filter((s) => s.kind === "basic").length;
   const cols = 3;
   const set: VennSet = {
@@ -136,9 +136,9 @@ export function createDerivedSet(d: Diagram, parentIds: string[], count: number)
   const id = `s${d.nextId}`;
   const joined = parents.map((p) => p.name).join("");
   const name = joined.length <= 16 ? joined : parents.map((p) => p.name).join(" ∩ ");
-  let common = parents[0].elements.slice();
+  let common = parents[0]!.elements.slice();
   for (let i = 1; i < parents.length; i++) {
-    const s = new Set(parents[i].elements);
+    const s = new Set(parents[i]!.elements);
     common = common.filter((e) => s.has(e));
   }
   const set: VennSet = {

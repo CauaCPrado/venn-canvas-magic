@@ -82,11 +82,11 @@ export function intersectionPathD(circles: Circle[]): string | null {
   const tol = 1e-3;
   for (let i = 0; i < circles.length; i++) {
     for (let j = i + 1; j < circles.length; j++) {
-      for (const p of circleCirclePoints(circles[i], circles[j])) {
+      for (const p of circleCirclePoints(circles[i]!, circles[j]!)) {
         let ok = true;
         for (let k = 0; k < circles.length; k++) {
           if (k === i || k === j) continue;
-          if (!pointInCircle(p, circles[k], 1e-3)) {
+          if (!pointInCircle(p, circles[k]!, 1e-3)) {
             ok = false;
             break;
           }
@@ -118,14 +118,14 @@ export function intersectionPathD(circles: Circle[]): string | null {
       Math.atan2(b.p.y - center.y, b.p.x - center.x),
   );
 
-  let d = `M ${nodes[0].p.x.toFixed(3)} ${nodes[0].p.y.toFixed(3)}`;
+  let d = `M ${nodes[0]!.p.x.toFixed(3)} ${nodes[0]!.p.y.toFixed(3)}`;
   for (let n = 0; n < nodes.length; n++) {
-    const from = nodes[n];
-    const to = nodes[(n + 1) % nodes.length];
+    const from = nodes[n]!;
+    const to = nodes[(n + 1) % nodes.length]!;
     const shared = from.on.filter((k) => to.on.includes(k));
     let chosen: { k: number; span: number } | null = null;
     for (const k of shared) {
-      const c = circles[k];
+      const c = circles[k]!;
       const a1 = angleOn(c, from.p);
       const a2 = angleOn(c, to.p);
       const span = norm(a2 - a1);
@@ -139,7 +139,7 @@ export function intersectionPathD(circles: Circle[]): string | null {
       d += ` L ${to.p.x.toFixed(3)} ${to.p.y.toFixed(3)}`;
       continue;
     }
-    const c = circles[chosen.k];
+    const c = circles[chosen.k]!;
     const large = chosen.span > Math.PI ? 1 : 0;
     d += ` A ${c.r.toFixed(3)} ${c.r.toFixed(3)} 0 ${large} 1 ${to.p.x.toFixed(3)} ${to.p.y.toFixed(3)}`;
   }
@@ -206,7 +206,7 @@ export function regionAnchors(spec: RegionSpec, count: number, step = 8): Pt[] {
       const i = gy * w + gx;
       if (dist2[i] === 0) continue;
       dist2[i] = Math.min(
-        dist2[i],
+        dist2[i]!,
         at(gx - 1, gy) + D1,
         at(gx, gy - 1) + D1,
         at(gx - 1, gy - 1) + D2,
@@ -219,7 +219,7 @@ export function regionAnchors(spec: RegionSpec, count: number, step = 8): Pt[] {
       const i = gy * w + gx;
       if (dist2[i] === 0) continue;
       dist2[i] = Math.min(
-        dist2[i],
+        dist2[i]!,
         at(gx + 1, gy) + D1,
         at(gx, gy + 1) + D1,
         at(gx + 1, gy + 1) + D2,
@@ -234,8 +234,8 @@ export function regionAnchors(spec: RegionSpec, count: number, step = 8): Pt[] {
     let best = -1;
     let bestVal = 0.4;
     for (let i = 0; i < scores.length; i++) {
-      if (scores[i] > bestVal) {
-        bestVal = scores[i];
+      if (scores[i]! > bestVal) {
+        bestVal = scores[i]!;
         best = i;
       }
     }
