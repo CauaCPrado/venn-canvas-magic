@@ -200,7 +200,7 @@ export function regionAnchors(spec: RegionSpec, count: number, step = 8): Pt[] {
   }
   const D1 = 1;
   const D2 = Math.SQRT2;
-  const at = (x: number, y: number) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : dist2[y * w + x]);
+  const at = (x: number, y: number) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : dist2[y * w + x]!);
   for (let gy = 0; gy < h; gy++) {
     for (let gx = 0; gx < w; gx++) {
       const i = gy * w + gx;
