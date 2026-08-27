@@ -1,42 +1,47 @@
-# Editor de Diagramas de Venn
+# Editor de Diagramas de Venn — versão revisada
 
-Um site de página única para criar, editar e manipular diagramas de Venn diretamente no navegador, sem login e sem backend.
+Site de página única (sem login e sem backend) para criar conjuntos, arrastá-los no canvas, extrair interseções como novos conjuntos e exportar o resultado. Base visual e de comportamento: o protótipo HTML enviado (Fraunces + Inter + IBM Plex Mono, fundo quadriculado azul-claro, painel lateral à esquerda, canvas à direita).
 
-## O que o usuário poderá fazer
+## Mudanças pedidas nesta revisão
 
-- Escolher entre 2 ou 3 conjuntos (círculos) no diagrama.
-- Editar o nome de cada conjunto e o texto de cada região (incluindo interseções).
-- Arrastar cada círculo para reposicionar e usar um controle de tamanho (raio) por círculo.
-- Alterar a cor de cada conjunto e a opacidade da mistura, com uma paleta pronta.
-- Editar o título do diagrama.
-- Desfazer/refazer as últimas alterações e resetar para o layout padrão.
-- Exportar o diagrama como SVG ou PNG, e salvar automaticamente o trabalho no navegador (localStorage), para continuar depois.
+### 1. Conjuntos sem elementos nomeados mostram só o número
 
-## Layout
+- Se o conjunto tem apenas quantidade (sem nomes), o círculo exibe um número grande centralizado (ex: `12`) com a legenda do nome, em vez de espalhar bolinhas.
+- Se o conjunto tem elementos nomeados, eles continuam aparecendo como chips posicionados na região correta.
+- Caso misto (nomes + quantidade extra), aparecem os chips nomeados mais um contador discreto `+7` na mesma região.
 
-```text
-+------------------------------------------------+
-|  Cabeçalho: título editável + Exportar SVG/PNG |
-+------------------+-----------------------------+
-|                  |  Painel lateral             |
-|   Canvas SVG     |  - Conjuntos (nome, cor,    |
-|   (círculos      |    tamanho)                 |
-|   arrastáveis)   |  - Textos das regiões       |
-|                  |  - Aparência (opacidade,    |
-|                  |    fundo, rótulos)          |
-+------------------+-----------------------------+
-```
+### 2. Recorte permanente: o conjunto pai fica "mordido"
 
-## Design
+- Ao transformar uma interseção em conjunto próprio, a área da interseção é removida de verdade dos conjuntos pais: os pais passam a ser desenhados como forma recortada (círculo menos a lente), permanentemente.
+- O recorte só volta ao normal quando a interseção é apagada ou a ação é desfeita (Ctrl+Z).
+- Os elementos e o contador dos pais são reposicionados para caber apenas na área restante.
 
-Estilo editorial e limpo: fundo claro neutro, tipografia com contraste entre um display serifado para títulos e uma sans para a interface, acentos em tons de teal/âmbar/coral para os conjuntos. Sem gradientes roxos genéricos. Todos os tokens de cor definidos no design system em `src/styles.css`.
+### 3. Formas geométricas exatas
+
+- A interseção extraída tem a forma exata da área comum (lente entre 2 círculos, ou o polígono curvo formado por 3+ círculos), desenhada com arcos SVG reais — nada de aproximação por círculo cortado.
+- A "mordida" no pai é o complemento exato dessa mesma forma, então as peças encaixam perfeitamente ao serem reposicionadas.
+- Ao arrastar ou redimensionar um círculo, as formas são recalculadas ao vivo. Se a interseção deixar de existir geometricamente, o conjunto derivado fica marcado como "sem região" e o pai volta inteiro até haver sobreposição de novo.
+
+### 4. Área de edição maior
+
+- Canvas maior e responsivo, ocupando a largura disponível, com altura ajustável arrastando a borda inferior.
+- Controles de zoom (`+`, `−`, "ajustar à tela") e navegação por arraste do fundo (pan), para trabalhar confortavelmente com muitos conjuntos.
+- Botão para recolher o painel lateral e usar a tela inteira, além do modo tela cheia do canvas.
+
+### 5. Atalhos de teclado
+
+- `Delete` / `Backspace`: excluir os conjuntos selecionados no canvas (sem diálogo de confirmação, já que há desfazer).
+- `Ctrl+Z` (`Cmd+Z`): desfazer. `Ctrl+Y` e `Ctrl+Shift+Z`: refazer.
+- Extras coerentes: `Esc` limpa a seleção, `Ctrl+A` seleciona todos, setas movem o conjunto selecionado, `Shift+clique` para seleção múltipla.
+- Os atalhos ficam desativados enquanto o foco está num campo de texto do painel.
+- Uma lista dos atalhos aparece num painel de ajuda no rodapé do canvas.
 
 ## Detalhes técnicos
 
-- Rota única em `src/routes/index.tsx` (substitui o placeholder), com `head()` próprio (título, descrição, og/twitter).
-- Estado do diagrama num hook `useVennDiagram` (conjuntos, posições, cores, textos, histórico undo/redo), persistido em localStorage lido dentro de `useEffect` para evitar mismatch de hidratação.
-- Canvas em SVG puro: círculos com `mix-blend-mode: multiply`, arraste via eventos de ponteiro (pointerdown/move/up) com coordenadas convertidas para o viewBox.
-- Rótulos das regiões posicionados por cálculo geométrico simples (centros e pontos médios das interseções), com possibilidade de ajuste ao arrastar os círculos.
-- Exportação: serializar o `<svg>` para arquivo `.svg`; para PNG, desenhar o SVG num `<canvas>` e baixar via `toDataURL`.
-- Componentes em `src/components/venn/` (VennCanvas, SetControls, RegionLabelsPanel, AppearancePanel, ExportMenu), usando shadcn (Slider, Input, Popover, Button, Tabs).
-- Sem backend: nada de banco de dados nesta etapa. Contas e diagramas salvos na nuvem podem vir depois.
+- Rota única em `src/routes/index.tsx` (substitui o placeholder), com `head()` próprio.
+- Estado central num reducer (`sets`, `selection`, `viewport`) com pilhas de histórico `past`/`future` para undo/redo; cada ação estrutural (criar, excluir, extrair interseção, mover/redimensionar ao soltar) empurra um snapshot. Persistência em localStorage lida dentro de `useEffect`.
+- Módulo de geometria `src/lib/venn-geometry.ts`: interseção círculo-círculo, ordenação dos pontos de borda, construção do path da região comum com comandos `A` (arcos) e construção do complemento via `fill-rule: evenodd` num único `<path>` por conjunto pai (subtraindo todas as regiões já extraídas).
+- Posicionamento de rótulos/chips por amostragem em grade dentro da forma resultante (reaproveitando a abordagem do protótipo), com escolha do ponto mais distante dos já ocupados.
+- Canvas SVG com `viewBox` controlado por estado de zoom/pan; arraste via eventos de ponteiro convertidos para coordenadas do viewBox.
+- Design system em `src/styles.css` com os tokens do protótipo (oklch), fontes carregadas por `<link>` no `__root.tsx`.
+- Componentes em `src/components/venn/`: `VennCanvas`, `SetCard`, `NewSetPanel`, `SelectionBar`, `OpsPanel`, `ShortcutsHelp`, `ExportMenu` (SVG e PNG).
