@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createBasicSet,
   createDerivedSet,
@@ -10,19 +10,25 @@ import {
 } from "@/lib/venn-model";
 
 const STORAGE_KEY = "venn-diagram-v2";
+const MAX_HISTORY = 80;
 
 export function useVennDiagram() {
   const [diagram, setDiagram] = useState<Diagram>(emptyDiagram);
   const [past, setPast] = useState<Diagram[]>([]);
   const [future, setFuture] = useState<Diagram[]>([]);
   const [loaded, setLoaded] = useState(false);
+  const current = useRef(diagram);
+  current.current = diagram;
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw) as Diagram;
-        if (parsed && Array.isArray(parsed.sets)) setDiagram(parsed);
+        if (parsed && Array.isArray(parsed.sets)) {
+          current.current = parsed;
+          setDiagram(parsed);
+        }
       }
     } catch {
       /* ignore */
@@ -39,25 +45,35 @@ export function useVennDiagram() {
     }
   }, [diagram, loaded]);
 
-  /** change that enters the undo history */
-  const commit = useCallback((updater: (d: Diagram) => Diagram) => {
-    setDiagram((current) => {
-      const next = updater(current);
-      if (next === current) return current;
-      setPast((p) => [...p.slice(-59), current]);
-      setFuture([]);
-      return next;
-    });
+  const apply = useCallback((next: Diagram) => {
+    current.current = next;
+    setDiagram(next);
   }, []);
 
+  /** change that enters the undo history */
+  const commit = useCallback(
+    (updater: (d: Diagram) => Diagram) => {
+      const before = current.current;
+      const next = updater(before);
+      if (next === before) return;
+      setPast((p) => [...p, before].slice(-MAX_HISTORY));
+      setFuture([]);
+      apply(next);
+    },
+    [apply],
+  );
+
   /** live change (drag in progress) — no history entry */
-  const preview = useCallback((updater: (d: Diagram) => Diagram) => {
-    setDiagram((current) => updater(current));
-  }, []);
+  const preview = useCallback(
+    (updater: (d: Diagram) => Diagram) => {
+      apply(updater(current.current));
+    },
+    [apply],
+  );
 
   /** push a snapshot taken before a live change sequence */
   const pushHistory = useCallback((snapshot: Diagram) => {
-    setPast((p) => [...p.slice(-59), snapshot]);
+    setPast((p) => [...p, snapshot].slice(-MAX_HISTORY));
     setFuture([]);
   }, []);
 
@@ -65,25 +81,21 @@ export function useVennDiagram() {
     setPast((p) => {
       if (p.length === 0) return p;
       const prev = p[p.length - 1]!;
-      setDiagram((current) => {
-        setFuture((f) => [current, ...f.slice(0, 59)]);
-        return prev;
-      });
+      setFuture((f) => [current.current, ...f].slice(0, MAX_HISTORY));
+      apply(prev);
       return p.slice(0, -1);
     });
-  }, []);
+  }, [apply]);
 
   const redo = useCallback(() => {
     setFuture((f) => {
       if (f.length === 0) return f;
       const next = f[0]!;
-      setDiagram((current) => {
-        setPast((p) => [...p, current]);
-        return next;
-      });
+      setPast((p) => [...p, current.current].slice(-MAX_HISTORY));
+      apply(next);
       return f.slice(1);
     });
-  }, []);
+  }, [apply]);
 
   const actions = {
     addBasic: (opts: { name?: string; elements?: string[]; count?: number }) =>

@@ -217,6 +217,18 @@ export function VennCanvas({
             return (
               <g key={`labels-${info.set.id}`} pointerEvents="none">
                 {info.nameAt && (
+                  <g>
+                    <rect
+                      x={info.nameAt.x - (info.set.name.length * 8 + 18) / 2}
+                      y={info.nameAt.y - 16}
+                      width={info.set.name.length * 8 + 18}
+                      height={24}
+                      rx={7}
+                      fill="var(--color-panel)"
+                      fillOpacity={info.set.kind === "derived" ? 0.92 : 0.7}
+                      stroke={info.set.kind === "derived" ? ink : "none"}
+                      strokeWidth={1.2}
+                    />
                   <text
                     x={info.nameAt.x}
                     y={info.nameAt.y}
@@ -229,6 +241,7 @@ export function VennCanvas({
                   >
                     {info.set.name}
                   </text>
+                  </g>
                 )}
                 {info.countAt && info.countValue > 0 && (
                   <text
@@ -330,7 +343,7 @@ function buildShapes(diagram: Diagram): ShapeInfo[] {
     const namedCount = set.elements.length;
     const wantsBigNumber = namedCount === 0 && set.count > 0;
     const wanted = 1 + namedCount + (set.count > 0 && !wantsBigNumber ? 1 : 0);
-    const anchors = path ? regionAnchors(spec, wanted, 8) : [];
+    const anchors = path ? regionAnchors(spec, wanted, 8, 62) : [];
 
     const nameAt = anchors[0] ?? null;
     let countAt: Pt | null = null;
