@@ -114,7 +114,11 @@ export function createBasicSet(
   const id = `s${d.nextId}`;
   const color = PALETTE[d.colorIdx % PALETTE.length]!;
   const idx = d.sets.filter((s) => s.kind === "basic").length;
-  const cols = 3;
+  // first three sets sit on a triangle so they already share a common area
+  const angle = -Math.PI / 2 + (idx % 3) * ((Math.PI * 2) / 3);
+  const ring = 115 + Math.floor(idx / 3) * 90;
+  const centerX = WORLD_W / 2 + Math.floor(idx / 3) * 40;
+  const centerY = WORLD_H / 2;
   const set: VennSet = {
     id,
     kind: "basic",
@@ -122,8 +126,8 @@ export function createBasicSet(
     color,
     elements: opts.elements ?? [],
     count: Math.max(0, Math.floor(opts.count ?? 0)),
-    cx: 360 + (idx % cols) * 300,
-    cy: 300 + Math.floor(idx / cols) * 300,
+    cx: centerX + Math.cos(angle) * ring,
+    cy: centerY + Math.sin(angle) * ring,
     r: 170,
     parentIds: [],
   };

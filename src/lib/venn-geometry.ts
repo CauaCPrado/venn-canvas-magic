@@ -184,7 +184,12 @@ export function inRegion(p: Pt, spec: RegionSpec) {
  * Grid sample of a region with a chamfer distance transform, so labels can be
  * placed at the most "open" spots of an arbitrarily shaped slice.
  */
-export function regionAnchors(spec: RegionSpec, count: number, step = 8): Pt[] {
+export function regionAnchors(
+  spec: RegionSpec,
+  count: number,
+  step = 8,
+  clearance = 60,
+): Pt[] {
   if (spec.circles.length === 0 || count <= 0) return [];
   const { minX, minY, maxX, maxY } = bboxOf(spec.circles);
   const w = Math.max(2, Math.ceil((maxX - minX) / step) + 1);
@@ -243,7 +248,7 @@ export function regionAnchors(spec: RegionSpec, count: number, step = 8): Pt[] {
     const bx = best % w;
     const by = Math.floor(best / w);
     picks.push({ x: minX + bx * step, y: minY + by * step });
-    const clearCells = Math.max(2, Math.round(26 / step));
+    const clearCells = Math.max(2, Math.round(clearance / step));
     for (let yy = by - clearCells; yy <= by + clearCells; yy++) {
       for (let xx = bx - clearCells; xx <= bx + clearCells; xx++) {
         if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
