@@ -78,23 +78,29 @@ export function useVennDiagram() {
   }, []);
 
   const undo = useCallback(() => {
-    setPast((p) => {
-      if (p.length === 0) return p;
-      const prev = p[p.length - 1]!;
-      setFuture((f) => [current.current, ...f].slice(0, MAX_HISTORY));
-      apply(prev);
-      return p.slice(0, -1);
-    });
+    const p = pastRef.current;
+    if (p.length === 0) return;
+    const prev = p[p.length - 1]!;
+    const nextFuture = [current.current, ...futureRef.current].slice(0, MAX_HISTORY);
+    const nextPast = p.slice(0, -1);
+    pastRef.current = nextPast;
+    futureRef.current = nextFuture;
+    setPast(nextPast);
+    setFuture(nextFuture);
+    apply(prev);
   }, [apply]);
 
   const redo = useCallback(() => {
-    setFuture((f) => {
-      if (f.length === 0) return f;
-      const next = f[0]!;
-      setPast((p) => [...p, current.current].slice(-MAX_HISTORY));
-      apply(next);
-      return f.slice(1);
-    });
+    const f = futureRef.current;
+    if (f.length === 0) return;
+    const next = f[0]!;
+    const nextPast = [...pastRef.current, current.current].slice(-MAX_HISTORY);
+    const nextFuture = f.slice(1);
+    pastRef.current = nextPast;
+    futureRef.current = nextFuture;
+    setPast(nextPast);
+    setFuture(nextFuture);
+    apply(next);
   }, [apply]);
 
   const actions = {
