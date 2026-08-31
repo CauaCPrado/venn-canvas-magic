@@ -19,6 +19,8 @@ export function useVennDiagram() {
   const [loaded, setLoaded] = useState(false);
   const current = useRef(diagram);
   current.current = diagram;
+  const pastRef = useRef<Diagram[]>([]);
+  const futureRef = useRef<Diagram[]>([]);
 
   useEffect(() => {
     try {
