@@ -78,7 +78,10 @@ export function useVennDiagram() {
 
   /** push a snapshot taken before a live change sequence */
   const pushHistory = useCallback((snapshot: Diagram) => {
-    setPast((p) => [...p, snapshot].slice(-MAX_HISTORY));
+    const nextPast = [...pastRef.current, snapshot].slice(-MAX_HISTORY);
+    pastRef.current = nextPast;
+    futureRef.current = [];
+    setPast(nextPast);
     setFuture([]);
   }, []);
 
