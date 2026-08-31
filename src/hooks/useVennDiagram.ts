@@ -58,7 +58,10 @@ export function useVennDiagram() {
       const before = current.current;
       const next = updater(before);
       if (next === before) return;
-      setPast((p) => [...p, before].slice(-MAX_HISTORY));
+      const nextPast = [...pastRef.current, before].slice(-MAX_HISTORY);
+      pastRef.current = nextPast;
+      futureRef.current = [];
+      setPast(nextPast);
       setFuture([]);
       apply(next);
     },
