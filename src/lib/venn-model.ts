@@ -15,6 +15,57 @@ export interface VennSet {
   r: number;
   // derived only
   parentIds: string[];
+  // derived only: free translation away from the geometric intersection
+  offsetX?: number;
+  offsetY?: number;
+}
+
+export const MAX_BASIC_SETS = 3;
+
+export function basicCount(d: Diagram) {
+  return d.sets.filter((s) => s.kind === "basic").length;
+}
+
+/**
+ * "Somente X": total of X minus the exclusive values of every derived set whose
+ * basic ancestors strictly contain X's ancestors (computed recursively, bottom-up,
+ * so a triple intersection is never subtracted twice).
+ */
+export function exclusiveSize(d: Diagram, id: string, memo = new Map<string, number>()): number {
+  const cached = memo.get(id);
+  if (cached !== undefined) return cached;
+  const s = findSet(d, id);
+  if (!s) return 0;
+  const own = flattenParents(d, id);
+  const key = basicKey(own);
+  const seenKeys = new Set<string>();
+  let sub = 0;
+  d.sets.forEach((o) => {
+    if (o.kind !== "derived" || o.id === id) return;
+    const ob = flattenParents(d, o.id);
+    if (ob.length <= own.length || !own.every((x) => ob.includes(x))) return;
+    const ok = basicKey(ob);
+    if (ok === key || seenKeys.has(ok)) return;
+    seenKeys.add(ok);
+    sub += exclusiveSize(d, o.id, memo);
+  });
+  const v = totalSize(s) - sub;
+  memo.set(id, v);
+  return v;
+}
+
+/** union total without double counting = sum of all exclusive regions (negatives clamp to 0) */
+export function unionTotal(d: Diagram) {
+  const memo = new Map<string, number>();
+  const seen = new Set<string>();
+  let sum = 0;
+  d.sets.forEach((s) => {
+    const k = basicKey(flattenParents(d, s.id));
+    if (seen.has(k)) return;
+    seen.add(k);
+    sum += Math.max(0, exclusiveSize(d, s.id, memo));
+  });
+  return sum;
 }
 
 export interface Diagram {
@@ -111,6 +162,7 @@ export function createBasicSet(
   d: Diagram,
   opts: { name?: string; elements?: string[]; count?: number },
 ): Diagram {
+  if (basicCount(d) >= MAX_BASIC_SETS) return d;
   const id = `s${d.nextId}`;
   const color = PALETTE[d.colorIdx % PALETTE.length]!;
   const idx = d.sets.filter((s) => s.kind === "basic").length;
@@ -156,6 +208,8 @@ export function createDerivedSet(d: Diagram, parentIds: string[], count: number)
     cy: 0,
     r: 0,
     parentIds: [...parentIds],
+    offsetX: 0,
+    offsetY: 0,
   };
   return { ...d, sets: [...d.sets, set], nextId: d.nextId + 1 };
 }

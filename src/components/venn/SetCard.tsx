@@ -1,9 +1,11 @@
-import { Trash2 } from "lucide-react";
+import { Crosshair, Trash2 } from "lucide-react";
 import { findSet, parseElements, totalSize, type Diagram, type VennSet } from "@/lib/venn-model";
 
 interface Props {
   set: VennSet;
   diagram: Diagram;
+  exclusive: number;
+  onRealign: (id: string) => void;
   selected: boolean;
   onSelect: (id: string, additive: boolean) => void;
   onLivePatch: (id: string, patch: Partial<VennSet>) => void;
@@ -14,6 +16,8 @@ interface Props {
 export function SetCard({
   set,
   diagram,
+  exclusive,
+  onRealign,
   selected,
   onSelect,
   onLivePatch,
@@ -72,7 +76,7 @@ export function SetCard({
       />
 
       <div className="mt-2 flex items-center gap-2">
-        <label className="flex-1 text-[11.5px] text-ink-soft">+ elementos sem nome</label>
+        <label className="flex-1 text-[11.5px] text-ink-soft">Total: + elementos sem nome</label>
         <input
           type="number"
           min={0}
@@ -100,8 +104,28 @@ export function SetCard({
         </div>
       )}
 
+      {derived && (set.offsetX || set.offsetY) ? (
+        <button
+          type="button"
+          className="btn-soft mt-2 w-full"
+          onClick={(e) => {
+            e.stopPropagation();
+            onRealign(set.id);
+          }}
+        >
+          <Crosshair className="size-4" /> Realinhar à interseção
+        </button>
+      ) : null}
+
+      <div
+        className={`mt-2 rounded-md border px-2 py-1 font-mono text-[11.5px] ${exclusive < 0 ? "border-danger/50 bg-danger-soft text-danger" : "border-border bg-panel text-ink-soft"}`}
+      >
+        Somente {set.name}: <strong>{exclusive}</strong>
+        {exclusive < 0 && <div className="mt-0.5">As interseções excedem o total deste conjunto.</div>}
+      </div>
+
       <div className="mt-1.5 font-mono text-[11px] text-ink-faint">
-        {totalSize(set)} elemento{totalSize(set) === 1 ? "" : "s"}
+        Total do conjunto: {totalSize(set)} elemento{totalSize(set) === 1 ? "" : "s"}
         {set.count > 0 && set.elements.length > 0
           ? ` (${set.elements.length} nomeados + ${set.count} sem nome)`
           : ""}

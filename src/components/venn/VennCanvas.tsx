@@ -10,6 +10,8 @@ import {
 import {
   circleOf,
   darken,
+  exclusiveSize,
+  totalSize,
   findSet,
   flattenParents,
   type Diagram,
@@ -34,6 +36,10 @@ interface ShapeInfo {
   countAt: Pt | null;
   countValue: number;
   countBig: boolean;
+  label: string;
+  negative: boolean;
+  ox: number;
+  oy: number;
 }
 
 interface Props {
@@ -109,16 +115,13 @@ export function VennCanvas({
 
   const handleShapePointerDown = (e: ReactPointerEvent, info: ShapeInfo) => {
     e.stopPropagation();
-    if (info.set.kind !== "basic") {
-      onSelect(info.set.id, e.shiftKey);
-      return;
-    }
     const p = toWorld(e.clientX, e.clientY);
     onDragStart();
+    const derived = info.set.kind !== "basic";
     dragRef.current = {
       id: info.set.id,
-      dx: p.x - info.set.cx,
-      dy: p.y - info.set.cy,
+      dx: p.x - (derived ? info.ox : info.set.cx),
+      dy: p.y - (derived ? info.oy : info.set.cy),
       moved: false,
     };
     (e.target as Element).setPointerCapture?.(e.pointerId);
@@ -199,6 +202,7 @@ export function VennCanvas({
               <path
                 key={`shape-${info.set.id}`}
                 className="venn-shape"
+                transform={info.ox || info.oy ? `translate(${info.ox} ${info.oy})` : undefined}
                 d={shapeWithHoles(info.path, info.holes)}
                 fillRule="evenodd"
                 fill={info.set.color}
@@ -215,13 +219,17 @@ export function VennCanvas({
             if (!info.path) return null;
             const ink = darken(info.set.color);
             return (
-              <g key={`labels-${info.set.id}`} pointerEvents="none">
+              <g
+                key={`labels-${info.set.id}`}
+                pointerEvents="none"
+                transform={info.ox || info.oy ? `translate(${info.ox} ${info.oy})` : undefined}
+              >
                 {info.nameAt && (
                   <g>
                     <rect
-                      x={info.nameAt.x - (info.set.name.length * 8 + 18) / 2}
+                      x={info.nameAt.x - (info.label.length * 7.6 + 18) / 2}
                       y={info.nameAt.y - 16}
-                      width={info.set.name.length * 8 + 18}
+                      width={info.label.length * 7.6 + 18}
                       height={24}
                       rx={7}
                       fill="var(--color-panel)"
@@ -239,16 +247,16 @@ export function VennCanvas({
                     fontWeight={600}
                     fontSize={17}
                   >
-                    {info.set.name}
+                    {info.label}
                   </text>
                   </g>
                 )}
-                {info.countAt && info.countValue > 0 && (
+                {info.countAt && (info.countValue !== 0 || info.negative) && (
                   <text
                     x={info.countAt.x}
                     y={info.countAt.y}
                     textAnchor="middle"
-                    fill={ink}
+                    fill={info.negative ? "var(--color-danger)" : ink}
                     fontFamily="IBM Plex Mono, monospace"
                     fontWeight={600}
                     fontSize={info.countBig ? 44 : 15}
@@ -319,6 +327,7 @@ function buildShapes(diagram: Diagram): ShapeInfo[] {
   const basics = diagram.sets.filter((s) => s.kind === "basic");
   const derived = diagram.sets.filter((s) => s.kind === "derived");
 
+  const memo = new Map<string, number>();
   const derivedResolved = derived.map((d) => {
     const basicIds = flattenParents(diagram, d.id);
     const circles = basicIds
@@ -341,7 +350,11 @@ function buildShapes(diagram: Diagram): ShapeInfo[] {
 
     const spec = { circles, holes: holeSources.map((h) => h.circles) };
     const namedCount = set.elements.length;
-    const wantsBigNumber = namedCount === 0 && set.count > 0;
+    const exclusive = exclusiveSize(diagram, set.id, memo);
+    const hasSubs = exclusive !== totalSize(set);
+    // show "Somente X" as the big number whenever the region only holds a count,
+    // or whenever extracted subsets change the exclusive value
+    const wantsBigNumber = (namedCount === 0 && set.count > 0) || hasSubs;
     const wanted = 1 + namedCount + (set.count > 0 && !wantsBigNumber ? 1 : 0);
     const anchors = path ? regionAnchors(spec, wanted, 8, 62) : [];
 
@@ -350,12 +363,13 @@ function buildShapes(diagram: Diagram): ShapeInfo[] {
     const chips: Array<{ text: string; at: Pt }> = [];
     if (wantsBigNumber) {
       countAt = nameAt ? { x: nameAt.x, y: nameAt.y + 40 } : null;
-    } else {
+    }
+    {
       set.elements.forEach((el, i) => {
         const at = anchors[i + 1];
         if (at) chips.push({ text: el, at });
       });
-      if (set.count > 0) {
+      if (set.count > 0 && !wantsBigNumber) {
         const at = anchors[namedCount + 1];
         if (at) countAt = at;
       }
@@ -370,8 +384,12 @@ function buildShapes(diagram: Diagram): ShapeInfo[] {
       nameAt,
       chips,
       countAt,
-      countValue: set.count,
+      countValue: wantsBigNumber ? exclusive : set.count,
       countBig: wantsBigNumber,
+      label: hasSubs ? `${set.name} (Total: ${totalSize(set)})` : set.name,
+      negative: exclusive < 0,
+      ox: set.kind === "derived" ? (set.offsetX ?? 0) : 0,
+      oy: set.kind === "derived" ? (set.offsetY ?? 0) : 0,
     } satisfies ShapeInfo;
   };
 

@@ -9,6 +9,7 @@ import {
   Plus,
   Redo2,
   Scissors,
+  AlertTriangle,
   Undo2,
 } from "lucide-react";
 import { VennCanvas, type Viewport } from "@/components/venn/VennCanvas";
@@ -17,6 +18,10 @@ import { ShortcutsHelp } from "@/components/venn/ShortcutsHelp";
 import { useVennDiagram } from "@/hooks/useVennDiagram";
 import {
   WORLD_H,
+  MAX_BASIC_SETS,
+  basicCount,
+  exclusiveSize,
+  unionTotal,
   WORLD_W,
   circleOf,
   findSet,
@@ -92,7 +97,9 @@ function VennPage() {
         pushHistory(dragSnapshot.current);
         dragSnapshot.current = null;
       }
-      actions.patchLive(id, { cx, cy });
+      const s = diagramRef.current.sets.find((x) => x.id === id);
+      if (s?.kind === "derived") actions.patchLive(id, { offsetX: cx, offsetY: cy });
+      else actions.patchLive(id, { cx, cy });
     },
     [actions, pushHistory],
   );
@@ -164,7 +171,11 @@ function VennPage() {
         commit((d) => ({
           ...d,
           sets: d.sets.map((s) =>
-            selected.has(s.id) && s.kind === "basic" ? { ...s, cx: s.cx + dx, cy: s.cy + dy } : s,
+            !selected.has(s.id)
+              ? s
+              : s.kind === "basic"
+                ? { ...s, cx: s.cx + dx, cy: s.cy + dy }
+                : { ...s, offsetX: (s.offsetX ?? 0) + dx, offsetY: (s.offsetY ?? 0) + dy },
           ),
         }));
       }
@@ -227,6 +238,15 @@ function VennPage() {
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
   };
+
+  const basicsUsed = basicCount(diagram);
+  const atLimit = basicsUsed >= MAX_BASIC_SETS;
+  const exclusives = useMemo(() => {
+    const memo = new Map<string, number>();
+    return new Map(diagram.sets.map((s) => [s.id, exclusiveSize(diagram, s.id, memo)]));
+  }, [diagram]);
+  const union = useMemo(() => unionTotal(diagram), [diagram]);
+  const inconsistent = diagram.sets.filter((s) => (exclusives.get(s.id) ?? 0) < 0);
 
   const canExtract = useMemo(() => {
     if (selectedSets.length < 2) return false;
@@ -328,7 +348,15 @@ function VennPage() {
         {sidebarOpen && (
           <aside className="space-y-4">
             <section className="panel">
-              <h2 className="mb-3 text-base">Novo conjunto</h2>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-base">Novo conjunto</h2>
+                <span
+                  className={`rounded-full border px-2 py-0.5 font-mono text-[11px] ${atLimit ? "border-danger/40 bg-danger-soft text-danger" : "border-border bg-field text-ink-soft"}`}
+                  title="Máximo de 3 conjuntos básicos (interseções não contam)"
+                >
+                  {basicsUsed}/{MAX_BASIC_SETS}
+                </span>
+              </div>
               <label className="mb-1 block text-xs font-semibold text-ink-soft">Nome</label>
               <input
                 className="field-input mb-2.5"
@@ -357,6 +385,8 @@ function VennPage() {
               </div>
               <button
                 className="btn-primary w-full"
+                disabled={atLimit}
+                title={atLimit ? "Limite máximo de 3 conjuntos atingido" : undefined}
                 onClick={() => {
                   actions.addBasic({
                     name: newName,
@@ -370,6 +400,11 @@ function VennPage() {
               >
                 <Plus className="size-4" /> Criar conjunto
               </button>
+              {atLimit && (
+                <p className="mt-2 text-[11.5px] text-danger">
+                  Limite máximo de 3 conjuntos atingido. Interseções extraídas não contam.
+                </p>
+              )}
             </section>
 
             <section className="panel">
@@ -386,6 +421,8 @@ function VennPage() {
                     key={s.id}
                     set={s}
                     diagram={diagram}
+                    exclusive={exclusives.get(s.id) ?? 0}
+                    onRealign={(id) => actions.patch(id, { offsetX: 0, offsetY: 0 })}
                     selected={selected.has(s.id)}
                     onSelect={toggleSelect}
                     onLivePatch={livePatch}
@@ -477,19 +514,47 @@ function VennPage() {
                 Crie conjuntos para ver os totais aqui.
               </p>
             ) : (
-              <div className="flex flex-wrap gap-2">
-                {diagram.sets.map((s) => (
-                  <span
-                    key={s.id}
-                    className="flex items-center gap-2 rounded-lg border border-border bg-field px-2.5 py-1 font-mono text-[11.5px]"
-                  >
-                    <span
-                      className="size-2.5 rounded-full"
-                      style={{ backgroundColor: s.color }}
-                    />
-                    {s.name}: {totalSize(s)}
-                  </span>
-                ))}
+              <div className="space-y-3">
+                <table className="w-full font-mono text-[12px]">
+                  <thead>
+                    <tr className="text-left text-ink-faint">
+                      <th className="py-1 font-normal">Conjunto</th>
+                      <th className="py-1 font-normal">Total</th>
+                      <th className="py-1 font-normal">Somente</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {diagram.sets.map((s) => {
+                      const ex = exclusives.get(s.id) ?? 0;
+                      return (
+                        <tr key={s.id} className="border-t border-border">
+                          <td className="py-1">
+                            <span className="flex items-center gap-2">
+                              <span
+                                className="size-2.5 rounded-full"
+                                style={{ backgroundColor: s.color }}
+                              />
+                              {s.kind === "derived" ? "∩ " : ""}
+                              {s.name}
+                            </span>
+                          </td>
+                          <td className="py-1">{totalSize(s)}</td>
+                          <td className={`py-1 ${ex < 0 ? "font-bold text-danger" : ""}`}>{ex}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <div className="font-mono text-[12.5px] font-semibold">
+                  Total geral da união: {union}
+                </div>
+                {inconsistent.length > 0 && (
+                  <div className="flex items-start gap-2 rounded-lg border border-danger/40 bg-danger-soft px-3 py-2 text-[12px] text-danger">
+                    <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                    A soma das interseções excede o total de:{" "}
+                    {inconsistent.map((s) => s.name).join(", ")}
+                  </div>
+                )}
               </div>
             )}
           </section>
